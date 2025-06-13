@@ -35259,11 +35259,12 @@ function get_line_info(compiler, line) {
  */
 function is_project_file(line, prefix) {
   // For absolute paths we only consider the ones prefix with 'work_dir'
-  if(external_node_path_namespaceObject.isAbsolute(line)) {
+  if (external_node_path_namespaceObject.isAbsolute(line)) {
+    debug_log(`is_project_file: checking absolute path.\n\tline:"${line}" and prefix:"${prefix}" -> ${line.startsWith(prefix)}`);
     return line.startsWith(prefix);
   }
 
-  debug_log(`is_project_file: checking line:${line} and prefix:${prefix} -> ${external_node_path_namespaceObject.resolve(prefix, line)}`);
+  debug_log(`is_project_file: checking relative path. \n\tline:"${line}" and prefix:"${prefix}" -> ${external_node_path_namespaceObject.resolve(prefix, line)}`);
   return external_node_fs_namespaceObject.existsSync(external_node_path_namespaceObject.resolve(prefix, line));
 }
 
@@ -35281,6 +35282,8 @@ function process_compile_output() {
   var num_warnings = 0;
   var num_errors = 0;
 
+  debug_log(`process_compile_output: prefix_dir="${prefix_dir}" exclude_dir="${exclude_dir}" compiler="${compiler}"`);
+
   const splitLines = str => str.split(/\r?\n/);
   const initialList = splitLines(compile_result).map(line => line.trimStart());
   initialList.forEach(function (part, index) {
@@ -35292,11 +35295,11 @@ function process_compile_output() {
   uniqueLines.forEach(line => {
     line = make_dir_universal(line).replace(prefix_dir, "");
 
-    debug_log(`Checking line: ${line} excluded=${excluded(line, exclude_dir)} and warning/error=${check_if_valid_line(compiler, line)}`)
-    if (!excluded(line, exclude_dir) && check_if_valid_line(compiler, line)) {
-      debug_log(`Parsing line: ${line}`);
-
+    debug_log(`Checking line: ${line} \n\t is_project_file=${is_project_file(line, prefix_dir)} excluded=${excluded(line, exclude_dir)} and warning/error=${check_if_valid_line(compiler, line)}`)
+    if (is_project_file(line, prefix_dir) && !excluded(line, exclude_dir) && check_if_valid_line(compiler, line)) {
       const [file_path, file_line_start, file_line_end, type] = get_line_info(compiler, line);
+
+      debug_log(`Line info: file_path= ${file_path} file_line_start=${file_line_start} file_line_end=${file_line_end} type=${type}`);
 
       // warning/error description
       const color_mark = type == "error" ? "-" : "!";
