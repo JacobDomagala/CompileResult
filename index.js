@@ -1,6 +1,7 @@
-const core = require('@actions/core');
-const github = require('@actions/github');
-const fs = require('fs');
+import path from 'node:path';
+import fs from 'node:fs';
+import * as core from '@actions/core';
+import * as github from '@actions/github';
 
 async function main() {
   const eventType = process.env.GITHUB_EVENT_NAME;
@@ -15,9 +16,8 @@ async function main() {
   }
 }
 
-if (require.main === module) {
-  main();
-}
+main();
+
 
 
 /**
@@ -27,7 +27,7 @@ if (require.main === module) {
  */
 function debug_log(log) {
   // Check if debug output is enabled
-  if (core.getInput("debug_output")) {
+  if (core.getBooleanInput("debug_output")) {
     // Log the message to the console
     console.log(log);
   }
@@ -52,7 +52,7 @@ function make_dir_universal(line) {
  * @returns {boolean} - True if the line does not contain the excluded directory, false otherwise.
  */
 function check_for_exclude_dir(line, exclude_dir) {
-  return exclude_dir.length === 0 || line.indexOf(exclude_dir) !== 0;
+  return exclude_dir.length === 0 || !line.startsWith(exclude_dir);
 }
 
 /**
@@ -105,7 +105,7 @@ function get_line_end(file_path, line_start) {
   const work_dir = process.env.GITHUB_WORKSPACE;
 
   // Read the file and convert it to a string
-  const file = fs.readFileSync(work_dir + file_path).toString('utf-8');
+  const file = fs.readFileSync(path.join(work_dir, file_path), 'utf8');
 
   // Count the number of lines in the file
   const num_lines = file.split(/\r?\n/).length - 1;
@@ -156,13 +156,30 @@ function get_line_info(compiler, line) {
 }
 
 /**
- * Parses the compile result file and generates a comment body with links to the files and
+ *o
+ * @param {string} line - line from compiler
+ * @param {string} prefix - project prefix
+ * @returns {boolean} - Whether a 'line' is referencing project file
+ */
+function is_project_file(line, prefix) {
+  // For absolute paths we only consider the ones prefix with 'work_dir'
+  if(path.isAbsolute(line)) {
+    return line.startsWith(prefix);
+  }
+
+  const abs = path.resolve(prefix, line);
+  const diff = path.relative(prefix, abs);
+  return !diff.startsWith('..');
+}
+
+/**
+ * Parses the compile result file and generates a cmment body with links to the files and
  * lines that caused warnings and errors.
  *
- * @returns {string} The comment body.
+ * @returns {string} - The comment body.
  */
 function process_compile_output() {
-  compile_result = fs.readFileSync(core.getInput('compile_result_file')).toString('utf-8');
+  const compile_result = fs.readFileSync(core.getInput('compile_result_file'), 'utf8');
   const prefix_dir = make_dir_universal(core.getInput('work_dir'));
   const exclude_dir = make_dir_universal(core.getInput('exclude_dir'));
   const compiler = core.getInput('compiler');
@@ -170,20 +187,20 @@ function process_compile_output() {
   var num_errors = 0;
 
   const splitLines = str => str.split(/\r?\n/);
-  initialList = splitLines(compile_result).map(line => line.trimStart());
+  const initialList = splitLines(compile_result).map(line => line.trimStart());
   initialList.forEach(function (part, index) {
     this[index] = this[index].split("\\").join("/");
   }, initialList);
 
   var matchingStrings = [];
-  uniqueLines = [...new Set(initialList)];
+  const uniqueLines = [...new Set(initialList)];
   uniqueLines.forEach(line => {
     line = make_dir_universal(line);
-    var idx = line.indexOf(prefix_dir);
+    var checkFile = is_project_file(line, prefix_dir);
 
-    // Only consider lines that start with 'prefix_dir'
-    debug_log(`Checking line: ${line} with idx=${idx} ${check_for_exclude_dir(line, exclude_dir)} and ${check_if_valid_line(compiler, line)}`)
-    if (idx == 0 && check_for_exclude_dir(line, exclude_dir) && check_if_valid_line(compiler, line)) {
+    // Only consider lines from project files
+    debug_log(`Checking line: ${line} with checkFile=${checkFile} ${check_for_exclude_dir(line, exclude_dir)} and ${check_if_valid_line(compiler, line)}`)
+    if (checkFile && check_for_exclude_dir(line, exclude_dir) && check_if_valid_line(compiler, line)) {
       debug_log(`Parsing line: ${line}`);
       line = line.replace(prefix_dir, "");
 
@@ -192,7 +209,7 @@ function process_compile_output() {
       // warning/error description
       const color_mark = type == "error" ? "-" : "!";
       type == "error" ? num_errors++ : num_warnings++;
-      description = "\n```diff\n" + `${color_mark}Line: ${file_line_start} ` + line.substring(line.indexOf(" ")) + "\n```\n";
+      const description = "\n```diff\n" + `${color_mark}Line: ${file_line_start} ` + line.substring(line.indexOf(" ")) + "\n```\n";
 
       // Concatinate both modified path to file and the description
       var link_with_description = `\n` + core.getInput('server_url') + `/${github.context.issue.owner}/${github.context.issue.repo}` +
@@ -293,7 +310,7 @@ async function create_or_update_comment(comment_id, comment_body) {
 }
 
 
-module.exports = {
+export {
   make_dir_universal,
   check_for_exclude_dir,
   check_if_valid_line,
