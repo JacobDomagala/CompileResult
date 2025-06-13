@@ -88,6 +88,7 @@ describe('get_line_info', () => {
 
     it('Absolute path same as prefix', () => {
       expect(is_project_file('/my/prefix/src/file.cpp', '/my/prefix')).toEqual(true);
+      expect(is_project_file('/my/prefix/src/file.cpp', '/my/prefix/')).toEqual(true);
     });
 
     it('Relative path not part of project', () => {

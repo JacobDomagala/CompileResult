@@ -178,8 +178,10 @@ function is_project_file(line, prefix) {
  */
 function process_compile_output() {
   const compile_result = fs.readFileSync(core.getInput('compile_result_file'), 'utf8');
-  const prefix_dir = make_dir_universal(core.getInput('work_dir'));
-  const exclude_dir = make_dir_universal(core.getInput('exclude_dir')).replace(prefix_dir, "");
+  const prefix_dir = make_dir_universal(core.getInput('work_dir')).replace(/\/+$/, '');
+  const exclude_dir = make_dir_universal(core.getInput('exclude_dir'))
+    .replace(prefix_dir, '')
+    .replace(/^\/+/, '');
   const compiler = core.getInput('compiler');
   var num_warnings = 0;
   var num_errors = 0;
@@ -195,7 +197,11 @@ function process_compile_output() {
   var matchingStrings = [];
   const uniqueLines = [...new Set(initialList)];
   uniqueLines.forEach(line => {
-    line = make_dir_universal(line).replace(prefix_dir, "");
+    line = make_dir_universal(line);
+    if (line === prefix_dir || line.startsWith(prefix_dir + '/')) {
+      line = line.slice(prefix_dir.length);
+      if (line.startsWith('/')) line = line.slice(1);
+    }
 
     debug_log(`Checking line: ${line} \n\t is_project_file=${is_project_file(line, prefix_dir)} excluded=${excluded(line, exclude_dir)} and warning/error=${check_if_valid_line(compiler, line)}`)
     if (is_project_file(line, prefix_dir) && !excluded(line, exclude_dir) && check_if_valid_line(compiler, line)) {
