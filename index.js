@@ -162,11 +162,11 @@ function get_line_info(compiler, line) {
 function is_project_file(line, prefix) {
   // For absolute paths we only consider the ones prefix with 'work_dir'
   if (path.isAbsolute(line)) {
-    debug_log(`is_project_file: checking absolute path.\n\tline:"${line}" and prefix:"${prefix}" -> ${line.startsWith(prefix)}`);
+    debug_log(`is_project_file: checking absolute path.\n\tline:"${line}" and prefix:"${prefix}"\n\t result: ${line.startsWith(prefix)}`);
     return line.startsWith(prefix);
   }
 
-  debug_log(`is_project_file: checking relative path. \n\tline:"${line}" and prefix:"${prefix}" -> ${path.resolve(prefix, line)}`);
+  debug_log(`is_project_file: checking relative path. \n\tline:"${line}" and prefix:"${prefix}"\n\t combined: "${path.resolve(prefix, line)}" result:${fs.existsSync(path.resolve(prefix, line))}`);
   return fs.existsSync(path.resolve(prefix, line));
 }
 
@@ -203,8 +203,11 @@ function process_compile_output() {
       if (line.startsWith('/')) line = line.slice(1);
     }
 
-    debug_log(`Checking line: ${line} \n\t is_project_file=${is_project_file(line, prefix_dir)} excluded=${excluded(line, exclude_dir)} and warning/error=${check_if_valid_line(compiler, line)}`)
-    if (is_project_file(line, prefix_dir) && !excluded(line, exclude_dir) && check_if_valid_line(compiler, line)) {
+    const project_file = is_project_file(line, prefix_dir);
+    const is_excluded = excluded(line, exclude_dir);
+    const warning_or_error = check_if_valid_line(compiler, line);
+    debug_log(`Checking line: ${line} \n\t is_project_file=${project_file} excluded=${is_excluded} and warning/error=${warning_or_error}`)
+    if (project_file && !is_excluded && warning_or_error) {
       const [file_path, file_line_start, file_line_end, type] = get_line_info(compiler, line);
 
       debug_log(`Line info: file_path= ${file_path} file_line_start=${file_line_start} file_line_end=${file_line_end} type=${type}`);
