@@ -102,7 +102,13 @@ function get_line_end(file_path, line_start) {
   const work_dir = process.env.GITHUB_WORKSPACE;
 
   // Read the file and convert it to a string
-  const file = fs.readFileSync(path.join(work_dir, file_path), 'utf8');
+  const abs_path = path.join(work_dir, file_path);
+  if(!fs.existsSync(abs_path)) {
+    debug_log(`get_line_end: file="${abs_path}" doesn't exist!`);
+    return line_start;
+  }
+
+  const file = fs.readFileSync(abs_path, 'utf8');
 
   // Count the number of lines in the file
   const num_lines = file.split(/\r?\n/).length - 1;
@@ -194,13 +200,16 @@ function process_compile_output() {
   // Filter out noise -> leave only lines with warning/error
   const diag = /(?:^|\s)(?:fatal\s+error|error|warning)(?:\s+(?:C\d{4}|#\d+))?:/i;
 
-  const initialList = fs.readFileSync(core.getInput('compile_result_file'), 'utf8')
+  const compiler_output = fs.readFileSync(core.getInput('compile_result_file'), 'utf8');
+  const initialList = compiler_output
     .split(/\r?\n/)
     .filter(l => diag.test(l))
     .map(line => line.trimStart().split("\\").join("/"));
 
   var matchingStrings = [];
   const uniqueLines = [...new Set(initialList)];
+
+  debug_log(`Compiler output (original):\n ${compiler_output}\n (filtered):\n ${uniqueLines}`);
 
   uniqueLines.forEach(line => {
     line = make_dir_universal(line);
@@ -209,14 +218,14 @@ function process_compile_output() {
       if (line.startsWith('/')) line = line.slice(1);
     }
 
-    const project_file = is_project_file(line, prefix_dir);
-    const is_excluded = excluded(line, exclude_dir);
+    const [file_path, file_line_start, file_line_end, type] = get_line_info(compiler, line);
+
+    const project_file = is_project_file(file_path, prefix_dir);
+    const is_excluded = excluded(file_path, exclude_dir);
     const warning_or_error = check_if_valid_line(compiler, line);
     debug_log(`Checking line: ${line} \n\t is_project_file=${project_file} excluded=${is_excluded} and warning/error=${warning_or_error}`)
 
     if (project_file && !is_excluded && warning_or_error) {
-      const [file_path, file_line_start, file_line_end, type] = get_line_info(compiler, line);
-
       debug_log(`Line info: file_path= ${file_path} file_line_start=${file_line_start} file_line_end=${file_line_end} type=${type}`);
 
       // warning/error description

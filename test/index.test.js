@@ -50,11 +50,13 @@ describe('get_line_end', () => {
   beforeEach(() => core.getInput.mockReturnValue('10'));
 
   it('caps at start+numLines', () => {
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     jest.spyOn(fs, 'readFileSync').mockReturnValue('\n'.repeat(50));
     expect(get_line_end('/f', 10)).toBe('20');
   });
 
   it('caps at file end', () => {
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     jest.spyOn(fs, 'readFileSync').mockReturnValue('\n'.repeat(12));
     expect(get_line_end('/f', 10)).toBe('12');
   });
@@ -64,18 +66,21 @@ describe('get_line_info', () => {
   beforeEach(() => core.getInput.mockReturnValue('10'));
 
   it('GCC line parsing', () => {
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     jest.spyOn(fs, 'readFileSync').mockReturnValue('\n'.repeat(123));
     expect(get_line_info('GCC', '/p.c:123: error: x'))
       .toEqual(['/p.c', '123', '123', 'error']);
   });
 
   it('Clang line parsing', () => {
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     jest.spyOn(fs, 'readFileSync').mockReturnValue('\n'.repeat(127));
     expect(get_line_info('Clang', '/p.c:123: error: x'))
       .toEqual(['/p.c', '123', '127', 'error']);
   });
 
   it('MSVC line parsing', () => {
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     jest.spyOn(fs, 'readFileSync').mockReturnValue('\n'.repeat(210));
     expect(get_line_info('MSVC', 'C:\\p.cpp(123): warning C420'))
       .toEqual(['C:\\p.cpp', '123', '133', 'warning']);
