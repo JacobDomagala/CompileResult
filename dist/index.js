@@ -35260,12 +35260,16 @@ function get_line_info(compiler, line) {
 function is_project_file(line, prefix) {
   // For absolute paths we only consider the ones prefix with 'work_dir'
   if (external_node_path_namespaceObject.isAbsolute(line)) {
-    debug_log(`is_project_file: checking absolute path.\n\tline:"${line}" and prefix:"${prefix}"\n\t result: ${line.startsWith(prefix)}`);
-    return line.startsWith(prefix);
+    const is_correct = line.startsWith(prefix);
+    debug_log(`is_project_file: checking absolute path.\n\tline:"${line}" and prefix:"${prefix}"\n\t result: ${is_correct}`);
+    return is_correct;
   }
 
-  debug_log(`is_project_file: checking relative path. \n\tline:"${line}" and prefix:"${prefix}"\n\t combined: "${external_node_path_namespaceObject.resolve(prefix, line)}" result:${external_node_fs_namespaceObject.existsSync(external_node_path_namespaceObject.resolve(prefix, line))}`);
-  return external_node_fs_namespaceObject.existsSync(external_node_path_namespaceObject.resolve(prefix, line));
+  const resolved_path = external_node_path_namespaceObject.resolve(prefix, line);
+  const exists = external_node_fs_namespaceObject.existsSync(resolved_path);
+  debug_log(`is_project_file: checking relative path. \n\tline:"${line}" and prefix:"${prefix}"\n\t combined: "${resolved_path}" result:${exists}`);
+
+  return exists;
 }
 
 /**
@@ -35275,7 +35279,6 @@ function is_project_file(line, prefix) {
  * @returns {string} - The comment body.
  */
 function process_compile_output() {
-  const compile_result = external_node_fs_namespaceObject.readFileSync(core.getInput('compile_result_file'), 'utf8');
   const prefix_dir = make_dir_universal(core.getInput('work_dir')).replace(/\/+$/, '');
   const exclude_dir = make_dir_universal(core.getInput('exclude_dir'))
     .replace(prefix_dir, '')
@@ -35286,14 +35289,17 @@ function process_compile_output() {
 
   debug_log(`process_compile_output: prefix_dir="${prefix_dir}" exclude_dir="${exclude_dir}" compiler="${compiler}"`);
 
-  const splitLines = str => str.split(/\r?\n/);
-  const initialList = splitLines(compile_result).map(line => line.trimStart());
-  initialList.forEach(function (part, index) {
-    this[index] = this[index].split("\\").join("/");
-  }, initialList);
+  // Filter out noise -> leave only lines with warning/error
+  const diag = /(?:^|\s)(?:fatal\s+error|error|warning)(?:\s+(?:C\d{4}|#\d+))?:/i;
+
+  const initialList = external_node_fs_namespaceObject.readFileSync(core.getInput('compile_result_file'), 'utf8')
+    .split(/\r?\n/)
+    .filter(l => diag.test(l))
+    .map(line => line.trimStart().split("\\").join("/"));
 
   var matchingStrings = [];
   const uniqueLines = [...new Set(initialList)];
+
   uniqueLines.forEach(line => {
     line = make_dir_universal(line);
     if (line === prefix_dir || line.startsWith(prefix_dir + '/')) {
@@ -35305,6 +35311,7 @@ function process_compile_output() {
     const is_excluded = excluded(line, exclude_dir);
     const warning_or_error = check_if_valid_line(compiler, line);
     debug_log(`Checking line: ${line} \n\t is_project_file=${project_file} excluded=${is_excluded} and warning/error=${warning_or_error}`)
+
     if (project_file && !is_excluded && warning_or_error) {
       const [file_path, file_line_start, file_line_end, type] = get_line_info(compiler, line);
 
