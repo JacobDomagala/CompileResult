@@ -23,11 +23,15 @@ main();
 /**
  * Logs a message to the console if debug output is enabled.
  *
- * @param {string} log - The message to log to the console.
+ * @param {string} msg - The message to log to the console.
  */
-function debug_log(log) {
-  if (core.getInput("debug_output") === "true") {
-    console.log(log);
+function debug_log(msg) {
+  if (core.getInput('debug_output') === 'true') {
+    const cyan  = '\x1b[36m';
+    const reset = '\x1b[0m';
+    console.log(
+      `${msg.split(/\r?\n/).map(l => `${cyan}${l}${reset}`).join('\n')}\n`
+    );
   }
 }
 
@@ -209,11 +213,11 @@ function process_compile_output() {
   var matchingStrings = [];
   const uniqueLines = [...new Set(initialList)];
 
-  debug_log(`Compiler output (original):\n ${compiler_output}\n (filtered):\n ${uniqueLines}`);
+  debug_log(`Compiler output (original):\n${compiler_output}\n(filtered):\n${uniqueLines}`);
 
   uniqueLines.forEach(line => {
     line = make_dir_universal(line);
-    if (line === prefix_dir || line.startsWith(prefix_dir + '/')) {
+    if (line.startsWith(prefix_dir + '/')) {
       line = line.slice(prefix_dir.length);
       if (line.startsWith('/')) line = line.slice(1);
     }
