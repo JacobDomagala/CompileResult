@@ -12,11 +12,13 @@ process.env.GITHUB_WORKSPACE = '';
 /* load mocked core and code under test */
 const core = await import('@actions/core');
 import fs from 'node:fs';
+import { describe } from 'node:test';
 const {
   make_dir_universal,
-  check_for_exclude_dir,
+  excluded,
   get_line_info,
-  get_line_end
+  get_line_end,
+  is_project_file
 } = await import('../index.js');
 
 /* reset after each test */
@@ -35,13 +37,13 @@ describe('make_dir_universal', () => {
   });
 });
 
-describe('check_for_exclude_dir', () => {
+describe('excluded', () => {
   it('true when exclude_dir empty', () =>
-    expect(check_for_exclude_dir('/x', '')).toBe(true));
+    expect(excluded('/x', '')).toBe(false));
   it('false when path starts with excluded dir', () =>
-    expect(check_for_exclude_dir('/x/y', '/x')).toBe(false));
+    expect(excluded('/x/y', '/x')).toBe(true));
   it('true when path outside excluded dir', () =>
-    expect(check_for_exclude_dir('/x/y', '/z')).toBe(true));
+    expect(excluded('/x/y', '/z')).toBe(false));
 });
 
 describe('get_line_end', () => {
@@ -78,4 +80,29 @@ describe('get_line_info', () => {
     expect(get_line_info('MSVC', 'C:\\p.cpp(123): warning C420'))
       .toEqual(['C:\\p.cpp', '123', '133', 'warning']);
   });
+
+  describe('is_project_file', () => {
+    it('Absolute path but different than prefix', () => {
+      expect(is_project_file('/some/abs/path/to/file.cpp', '/my/prefix')).toEqual(false);
+    });
+
+    it('Absolute path same as prefix', () => {
+      expect(is_project_file('/my/prefix/src/file.cpp', '/my/prefix')).toEqual(true);
+    });
+
+    it('Relative path not part of project', () => {
+      spy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+
+      expect(is_project_file('src/file.cpp', '/my/prefix')).toEqual(true);
+      expect(spy).toHaveBeenCalledWith('/my/prefix/src/file.cpp');
+    });
+
+    it('Relative path not part of project', () => {
+      spy = jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+      expect(is_project_file('src/file.cpp', '/my/prefix')).toEqual(false);
+      expect(spy).toHaveBeenCalledWith('/my/prefix/src/file.cpp');
+    });
+  });
+
 });

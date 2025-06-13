@@ -35077,11 +35077,12 @@ var __webpack_exports__ = {};
 
 // EXPORTS
 __nccwpck_require__.d(__webpack_exports__, {
-  Sb: () => (/* binding */ check_for_exclude_dir),
   pW: () => (/* binding */ check_if_valid_line),
+  t7: () => (/* binding */ excluded),
   KO: () => (/* binding */ get_issue_type),
   aY: () => (/* binding */ get_line_end),
   zi: () => (/* binding */ get_line_info),
+  Au: () => (/* binding */ is_project_file),
   Ji: () => (/* binding */ make_dir_universal),
   O4: () => (/* binding */ process_compile_output)
 });
@@ -35123,9 +35124,7 @@ main();
  * @param {string} log - The message to log to the console.
  */
 function debug_log(log) {
-  // Check if debug output is enabled
-  if (core.getBooleanInput("debug_output")) {
-    // Log the message to the console
+  if (core.getInput("debug_output") === "true") {
     console.log(log);
   }
 }
@@ -35137,19 +35136,18 @@ function debug_log(log) {
  * @returns {string} - The converted directory path.
  */
 function make_dir_universal(line) {
-  // Split the directory path by backslashes and rejoin with forward slashes
   return line.split("\\").join("/");
 }
 
 /**
- * Checks if a given line contains an excluded directory.
+ * Check if the line contains file from excluded directory
  *
  * @param {string} line - The line to check.
  * @param {string} exclude_dir - The excluded directory to check for.
- * @returns {boolean} - True if the line does not contain the excluded directory, false otherwise.
+ * @returns {boolean} - True if the line does contain the excluded directory, false otherwise.
  */
-function check_for_exclude_dir(line, exclude_dir) {
-  return exclude_dir.length === 0 || !line.startsWith(exclude_dir);
+function excluded(line, exclude_dir) {
+  return exclude_dir.length > 0 && line.startsWith(exclude_dir);
 }
 
 /**
@@ -35253,7 +35251,8 @@ function get_line_info(compiler, line) {
 }
 
 /**
- *o
+ * Check whether given 'line' either starts with 'prefix' or is relative to 'prefix'
+ *
  * @param {string} line - line from compiler
  * @param {string} prefix - project prefix
  * @returns {boolean} - Whether a 'line' is referencing project file
@@ -35264,9 +35263,8 @@ function is_project_file(line, prefix) {
     return line.startsWith(prefix);
   }
 
-  const abs = external_node_path_namespaceObject.resolve(prefix, line);
-  const diff = external_node_path_namespaceObject.relative(prefix, abs);
-  return !diff.startsWith('..');
+  debug_log(`is_project_file: checking line:${line} and prefix:${prefix} -> ${external_node_path_namespaceObject.resolve(prefix, line)}`);
+  return external_node_fs_namespaceObject.existsSync(external_node_path_namespaceObject.resolve(prefix, line));
 }
 
 /**
@@ -35278,7 +35276,7 @@ function is_project_file(line, prefix) {
 function process_compile_output() {
   const compile_result = external_node_fs_namespaceObject.readFileSync(core.getInput('compile_result_file'), 'utf8');
   const prefix_dir = make_dir_universal(core.getInput('work_dir'));
-  const exclude_dir = make_dir_universal(core.getInput('exclude_dir'));
+  const exclude_dir = make_dir_universal(core.getInput('exclude_dir')).replace(prefix_dir, "");
   const compiler = core.getInput('compiler');
   var num_warnings = 0;
   var num_errors = 0;
@@ -35292,14 +35290,11 @@ function process_compile_output() {
   var matchingStrings = [];
   const uniqueLines = [...new Set(initialList)];
   uniqueLines.forEach(line => {
-    line = make_dir_universal(line);
-    var checkFile = is_project_file(line, prefix_dir);
+    line = make_dir_universal(line).replace(prefix_dir, "");
 
-    // Only consider lines from project files
-    debug_log(`Checking line: ${line} with checkFile=${checkFile} ${check_for_exclude_dir(line, exclude_dir)} and ${check_if_valid_line(compiler, line)}`)
-    if (checkFile && check_for_exclude_dir(line, exclude_dir) && check_if_valid_line(compiler, line)) {
+    debug_log(`Checking line: ${line} excluded=${excluded(line, exclude_dir)} and warning/error=${check_if_valid_line(compiler, line)}`)
+    if (!excluded(line, exclude_dir) && check_if_valid_line(compiler, line)) {
       debug_log(`Parsing line: ${line}`);
-      line = line.replace(prefix_dir, "");
 
       const [file_path, file_line_start, file_line_end, type] = get_line_info(compiler, line);
 
@@ -35390,7 +35385,7 @@ async function create_or_update_comment(comment_id, comment_body) {
     await octokit.issues.createComment({
       owner: github.context.issue.owner,
       repo: github.context.issue.repo,
-      issue_number: core.getInput("pull_request_number"),
+      issue_number: Number(core.getInput("pull_request_number")),
       body: comment_body,
     });
   }
@@ -35409,11 +35404,12 @@ async function create_or_update_comment(comment_id, comment_body) {
 
 
 
-var __webpack_exports__check_for_exclude_dir = __webpack_exports__.Sb;
 var __webpack_exports__check_if_valid_line = __webpack_exports__.pW;
+var __webpack_exports__excluded = __webpack_exports__.t7;
 var __webpack_exports__get_issue_type = __webpack_exports__.KO;
 var __webpack_exports__get_line_end = __webpack_exports__.aY;
 var __webpack_exports__get_line_info = __webpack_exports__.zi;
+var __webpack_exports__is_project_file = __webpack_exports__.Au;
 var __webpack_exports__make_dir_universal = __webpack_exports__.Ji;
 var __webpack_exports__process_compile_output = __webpack_exports__.O4;
-export { __webpack_exports__check_for_exclude_dir as check_for_exclude_dir, __webpack_exports__check_if_valid_line as check_if_valid_line, __webpack_exports__get_issue_type as get_issue_type, __webpack_exports__get_line_end as get_line_end, __webpack_exports__get_line_info as get_line_info, __webpack_exports__make_dir_universal as make_dir_universal, __webpack_exports__process_compile_output as process_compile_output };
+export { __webpack_exports__check_if_valid_line as check_if_valid_line, __webpack_exports__excluded as excluded, __webpack_exports__get_issue_type as get_issue_type, __webpack_exports__get_line_end as get_line_end, __webpack_exports__get_line_info as get_line_info, __webpack_exports__is_project_file as is_project_file, __webpack_exports__make_dir_universal as make_dir_universal, __webpack_exports__process_compile_output as process_compile_output };
