@@ -1,50 +1,55 @@
 # Compile Result
 
-The Compile Result GitHub action parses build output for C/C++ based applications and creates a comment on the pull request with any issues found. The generated comment includes code snippets alongside descriptions of the identified issues. When this action runs for the first time, it creates a comment with the initial results for the current pull request. Subsequent runs will edit this comment to update the status.
+Compile Result parses C/C++ compiler output and creates or updates a pull request comment with warnings and errors, including links to source files and line snippets.
 
 ## Output Example
+
 ![output](https://github.com/JacobDomagala/CompileResult/wiki/example_output.png)
 
 ## Workflow Example
 
-```yml
+```yaml
 name: Build on Ubuntu
 
-on: [pull_request]
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
-  Compile:
+  compile:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-    - name: Setup
-      shell: bash
-      run: cmake -E make_directory ${{runner.workspace}}/build
-    - name: Build
-      working-directory: ${{runner.workspace}}/build
-      shell: bash
-      run: |
-        cmake $GITHUB_WORKSPACE
-        cmake --build . 2> >(tee "output.txt")
-    - name: Post PR comment for warnings/errors
-      if: always()
-      uses: JacobDomagala/CompileResult@master
-      with:
-        comment_title: UBUNTU COMPILE RESULT
-        compile_result_file: ${{runner.workspace}}/build/output.txt
+      - name: Configure
+        run: cmake -S . -B build
+
+      - name: Build
+        run: cmake --build build 2>&1 | tee build/output.txt
+
+      - name: Post PR comment for warnings/errors
+        if: always()
+        uses: JacobDomagala/CompileResult@master
+        with:
+          comment_title: UBUNTU COMPILE RESULT
+          compile_result_file: build/output.txt
+          compiler: GNU
 ```
 
 ## Inputs
 
-| Name                    | Required | Description                                          | Default value          |
-|-------------------------|----------|------------------------------------------------------|:----------------------:|
-| `compile_result_file`   | TRUE     | The file containing the compilation results          | `empty`                |
-| `compiler`              | TRUE     | The compiler used to produce the output (MSVC/GNU/CLANG) | `GNU`                |
-| `token`                 | TRUE     | GITHUB_TOKEN or a repo-scoped PAT                    | `${{github.token}}`    |
-| `work_dir`              | TRUE     | The action work directory                            | `${{github.workspace}}`|
-| `exclude_dir`           | FALSE    | The full path to the directory to be ignored         | `<empty>`              |
-| `pull_request_number`   | TRUE     | The GitHub Pull Request number                       | `${{github.event.pull_request.number}}`|
-| `comment_title`         | TRUE     | The comment title displayed at the top of the comment. It is also used to determine whether the comment already exists and should be edited or not. | `COMPILE RESULT` |
-| `num_lines_to_display`  | FALSE    | The number of lines for the code snippet displayed for each error/warning | `5` |
-| `server_url`            | FALSE    | URL of GitHub Enterprise server (defaults to github.com)  | `https://github.com` |
+| Name | Required | Description | Default |
+|------|----------|-------------|---------|
+| `compile_result_file` | Yes | File that contains the compiler output. | `empty` |
+| `compiler` | Yes | Compiler used to produce the output (`MSVC`, `GNU`, `CLANG`). | `GNU` |
+| `token` | Yes | `GITHUB_TOKEN` or a repo-scoped PAT used to create/update the PR comment. | `${{ github.token }}` |
+| `work_dir` | Yes | Workspace root used to map diagnostics to repository files. | `${{ github.workspace }}` |
+| `exclude_dir` | No | Full path to directory that should be ignored. | `<empty>` |
+| `pull_request_number` | Yes | Pull request number to post/update the comment on. | `${{ github.event.pull_request.number }}` |
+| `comment_title` | Yes | Title shown in the PR comment and used to find/update an existing bot comment. | `COMPILE RESULT` |
+| `num_lines_to_display` | No | Number of lines shown in each code snippet. | `5` |
+| `debug_output` | No | Print debug logs while parsing output. | `false` |
+| `server_url` | No | GitHub/GitHub Enterprise server URL. | `https://github.com` |
